@@ -1,4 +1,4 @@
-import {INativeTagMap} from '../common/GenericTagTypes.js';
+import type {INativeTagMap} from '../common/GenericTagTypes.js';
 import {CaseInsensitiveTagMap} from '../common/CaseInsensitiveTagMap.js';
 
 /**
@@ -30,12 +30,6 @@ export const id3v22TagMap: INativeTagMap = {
   TEN: 'encodedby',
   TSS: 'encodersettings',
   WAR: 'website',
-  'COM:iTunPGAP': 'gapless'
-  /* ToDo: iTunes tags:
-  'COM:iTunNORM': ,
-  'COM:iTunSMPB': 'encoder delay',
-  'COM:iTunes_CDDB_IDs'
-  */,
 
   PCS: 'podcast',
   TCP: "compilation",

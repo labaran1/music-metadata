@@ -4,6 +4,7 @@ import path from 'node:path';
 import * as mm from '../lib/index.js';
 import { Parsers } from './metadata-parsers.js';
 import { samplePath } from './util.js';
+import type { IPicture } from '../lib/index.js';
 
 describe('Parse APE (Monkey\'s Audio)', () => {
 
@@ -34,20 +35,19 @@ describe('Parse APE (Monkey\'s Audio)', () => {
   function checkNative(ape: mm.INativeTagDict) {
     assert.deepEqual(ape.ENSEMBLE, ['Audioslave']);
     assert.deepEqual(ape.Artist, ['Audioslave', 'Chris Cornell']);
-    assert.strictEqual(ape['Cover Art (Front)'][0].data.length, 48658, 'raw cover art (front) length');
-    assert.strictEqual(ape['Cover Art (Back)'][0].data.length, 48658, 'raw cover art (front) length');
+    assert.strictEqual((ape['Cover Art (Front)'][0] as IPicture).data.length, 48658, 'raw cover art (front) length');
+    assert.strictEqual((ape['Cover Art (Back)'][0] as IPicture).data.length, 48658, 'raw cover art (front) length');
   }
 
   Parsers.forEach(parser => {
     it(parser.description, async function(){
-      const metadata = await parser.initParser(this.skip(), path.join(samplePath, 'monkeysaudio.ape'), 'audio/ape');
+      const metadata = await parser.initParser(() => this.skip(), path.join(samplePath, 'monkeysaudio.ape'), 'audio/ape');
       assert.isDefined(metadata, 'metadata should be defined');
       checkFormat(metadata.format);
       checkCommon(metadata.common);
       assert.isDefined(metadata.native, 'metadata.native should be defined');
       assert.isDefined(metadata.native.APEv2, 'metadata.native.APEv2 should be defined');
       checkNative(mm.orderTags(metadata.native.APEv2));
-
     });
   });
 

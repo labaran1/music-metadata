@@ -1,8 +1,12 @@
-import { GenericTagId, TagType } from './common/GenericTagTypes.js';
-import { IFooter } from './apev2/APEv2Token.js';
-import { TrackType } from './matroska/types.js';
+import type { GenericTagId, TagType } from './common/GenericTagTypes.js';
+import type { IFooter } from './apev2/APEv2Token.js';
+import type { TrackType } from './matroska/types.js';
+import type { LyricsContentType, TimestampFormat } from './id3v2/ID3v2Token.js';
 
 export { TrackType } from './matroska/types.js';
+export { LyricsContentType, TimestampFormat } from './id3v2/ID3v2Token.js';
+
+export type AnyTagValue = unknown;
 
 /**
  * Attached picture, typically used for cover art
@@ -90,7 +94,7 @@ export interface ICommonTagsResult {
   /**
    * List of comments
    */
-  comment?: string[];
+  comment?: IComment[];
   /**
    * Genre
    */
@@ -104,9 +108,9 @@ export interface ICommonTagsResult {
    */
   composer?: string[];
   /**
-   * Lyrics
+   * Synchronized lyrics
    */
-  lyrics?: string[];
+  lyrics?: ILyricsTag[];
   /**
    * Album title, formatted for alphabetic ordering
    */
@@ -511,8 +515,8 @@ export interface IFormat {
 }
 
 export interface ITag {
-  id: string,
-  value: any
+  id: string;
+  value: AnyTagValue;
 }
 
 export interface IChapter {
@@ -538,7 +542,7 @@ export interface INativeTags {
  * Tags ordered by tag-ID
  */
 export interface INativeTagDict {
-  [tagId: string]: any[];
+  [tagId: string]: AnyTagValue[];
 }
 
 export interface INativeAudioMetadata {
@@ -564,7 +568,6 @@ export interface IAudioMetadata extends INativeAudioMetadata {
    * Metadata, form independent interface
    */
   common: ICommonTagsResult;
-
 }
 
 /**
@@ -657,7 +660,7 @@ export interface IMetadataEvent {
     /**
      * Tag value
      */
-    value: any
+    value: AnyTagValue
   };
 
   /**
@@ -688,4 +691,28 @@ export interface IRandomReader {
    * @return {Promise<number>} bytes read
    */
   randomRead(buffer: Uint8Array, offset: number, length: number, position: number): Promise<number>;
+}
+
+interface ILyricsText {
+  text: string;
+  timestamp?: number;
+}
+
+export interface IComment {
+  descriptor?: string;
+  language?: string;
+  text?: string;
+}
+
+export interface ILyricsTag extends IComment {
+  contentType: LyricsContentType;
+  timeStampFormat: TimestampFormat;
+  /**
+   * Un-synchronized lyrics
+   */
+  text?: string;
+  /**
+   * Synchronized lyrics
+   */
+  syncText: ILyricsText[];
 }

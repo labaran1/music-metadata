@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 
 import * as mm from '../lib/index.js';
-import { IAudioMetadata, IOptions } from '../lib/index.js';
+import type { IAudioMetadata, IOptions } from '../lib/index.js';
 
 type ParseFileMethod = (skipTest: () => void, filePath: string, mimeType?: string, options?: IOptions) => Promise<IAudioMetadata>;
 
@@ -33,7 +33,7 @@ export const Parsers: IParser[] = [
   }, {
     description: 'parseBlob',
     initParser: (skipTest, filePath: string, mimeType?: string, options?: IOptions) => {
-      if (nodeMajorVersion < 120) {
+      if (nodeMajorVersion < 20) {
         skipTest();
       }
       const buffer = fs.readFileSync(filePath);

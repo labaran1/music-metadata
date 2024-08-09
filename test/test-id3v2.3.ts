@@ -6,6 +6,9 @@ import { ID3v2Parser } from '../lib/id3v2/ID3v2Parser.js';
 import { MetadataCollector } from '../lib/common/MetadataCollector.js';
 import * as mm from '../lib/index.js';
 import { samplePath } from './util.js';
+import { LyricsContentType, TimestampFormat, type ILyricsTag } from '../lib/core.js';
+import type { IPicture } from '../lib/index.js';
+import type { IGeneralEncapsulatedObject } from '../lib/id3v2/FrameParser.js';
 
 describe('Extract metadata from ID3v2.3 header', () => {
 
@@ -81,7 +84,7 @@ describe('Extract metadata from ID3v2.3 header', () => {
       assert.deepEqual(id3v23['TXXX:PERFORMER'], ['Explosions In The Sky'], 'native: TXXX:PERFORMER');
       assert.deepEqual(id3v23['TXXX:PERFORMER'], ['Explosions In The Sky'], 'native: TXXX:PERFORMER');
 
-      const apic = id3v23.APIC[0];
+      const apic = id3v23.APIC[0] as IPicture;
       assert.strictEqual(apic.format, 'image/jpeg', 'raw APIC format');
       assert.strictEqual(apic.type, 'Cover (front)', 'raw APIC tagTypes');
       assert.strictEqual(apic.description, '', 'raw APIC description');
@@ -178,7 +181,19 @@ describe('Extract metadata from ID3v2.3 header', () => {
     assert.deepEqual(id3v23.TPE1, ['2 Unlimited2', 'Ray', 'Anita'], 'null separated id3v23.TPE1');
 
     assert.deepEqual(common.artists, ['2 Unlimited2', 'Ray', 'Anita'], 'common.artists');
-    assert.deepEqual(common.comment, ['[DJSet]', '[All]'], 'common.comment');
+    assert.isDefined(common.comment, 'common.comment');
+    assert.deepEqual(common.comment, [
+      {
+        descriptor: "",
+        language: "eng",
+        text: "[DJSet]"
+      },
+      {
+        descriptor: "",
+        language: "eng",
+        text: "[All]"
+      }
+    ], 'common.comment');
     assert.deepEqual(common.genre, ['Dance', 'Classics'], 'common.genre');
 
     ['TPE1', 'TCOM', 'TCON'].forEach(tag => {
@@ -206,7 +221,7 @@ describe('Extract metadata from ID3v2.3 header', () => {
       const metadata = await mm.parseFile(path.join(samplePath, 'id3v2-lyrics.mp3'));
       const id3v23 = mm.orderTags(metadata.native['ID3v2.3']);
       /* eslint-disable max-len */
-      assert.deepEqual(id3v23.WCOM[0], 'http://www.amazon.com/Rotation-Cute-What-We-Aim/dp/B0018QCXAU%3FSubscriptionId%3D0R6CGKPJ3EKNPQBPYJR2%26tag%3Dsoftpointer-20%26linkCode%3Dxm2%26camp%3D2025%26creative%3D165953%26creativeASIN%3DB0018QCXAU ');
+      assert.deepEqual(id3v23.WCOM[0], 'http://www.amazon.com/Rotation-Cute-What-We-Aim/dp/B0018QCXAU%3FSubscriptionId%3D0R6CGKPJ3EKNPQBPYJR2%26tag%3Dsoftpointer-20%26linkCode%3Dxm2%26camp%3D2025%26creative%3D165953%26creativeASIN%3DB0018QCXAU');
     });
 
     describe('4.3.2 WXXX: User defined URL link frame', () => {
@@ -241,32 +256,98 @@ describe('Extract metadata from ID3v2.3 header', () => {
     it('4.5 MCDI: Music CD identifier', async () => {
       const metadata = await mm.parseFile(path.join(samplePath, '04-Strawberry.mp3'));
       const id3v23 = mm.orderTags(metadata.native['ID3v2.3']);
-      assert.equal(id3v23.MCDI[0].length, 804, 'TOC');
+      assert.equal((id3v23.MCDI[0] as string).length, 804, 'TOC');
     });
 
     // https://id3.org/id3v2.3.0#Unsychronised_lyrics.2Ftext_transcription
-    it('4.9 Unsychronised lyrics/text transcription', async () => {
+    it('4.9 USLT: Unsychronised lyrics/text transcription', async () => {
+
+      const expectedLyricsText = "Lord, have mercy, Lord, have mercy on me\nLord, have mercy, Lord, have mercy on me\n" +
+        "Well, if I've done somebody wrong\nLord, have mercy if you please\n\n" +
+        "I used to have plenty of money\nThe finest clothes in town\n" +
+        "Bad luck and trouble overtook me\nAnd God, look at me now\n\n" +
+        "Please have mercy, Lord, have mercy on me\nAnd if I've done somebody wrong\nLord, have mercy if you please\n\n" +
+        "Keep on working, my child\nOh, in the morning, oh\nLord, have mercy\n\nIf I've been a bad girl, baby\nYeah, I'll change my ways\n" +
+        "Don't want bad luck and trouble\nOn me all my days\n\n" +
+        "Please have mercy, Lord, have mercy on me\nAnd if I've done somebody wrong\nLord, have mercy if you please\n" +
+        "Have mercy on me";
+
       const {native, common} = await mm.parseFile(path.join(samplePath, 'MusicBrainz - Beth Hart - Sinner\'s Prayer [id3v2.3].V2.mp3'));
-      const lyrics =  "Lord, have mercy, Lord, have mercy on me\nLord, have mercy, Lord, have mercy on me\n" +
-          "Well, if I've done somebody wrong\nLord, have mercy if you please\n\n" +
-          "I used to have plenty of money\nThe finest clothes in town\n" +
-          "Bad luck and trouble overtook me\nAnd God, look at me now\n\n" +
-          "Please have mercy, Lord, have mercy on me\nAnd if I've done somebody wrong\nLord, have mercy if you please\n\n" +
-          "Keep on working, my child\nOh, in the morning, oh\nLord, have mercy\n\nIf I've been a bad girl, baby\nYeah, I'll change my ways\n" +
-          "Don't want bad luck and trouble\nOn me all my days\n\n" +
-          "Please have mercy, Lord, have mercy on me\nAnd if I've done somebody wrong\nLord, have mercy if you please\n" +
-          "Have mercy on me";
+
       const id3v23 = mm.orderTags(native['ID3v2.3']);
       assert.isDefined(id3v23.USLT, 'Should contain ID3v2.3 USLT tag');
-      assert.deepEqual(id3v23.USLT[0], {
-        description: "Sinner's Prayer",
-        language: "eng",
-        text: lyrics
-      });
+      assert.strictEqual(id3v23.USLT.length,1, 'id3v23.USLT.length');
+      const uslt = id3v23.USLT[0] as ILyricsTag;
+      assert.strictEqual(uslt.descriptor, "Sinner's Prayer", 'id3v23.USLT.description');
+      assert.strictEqual(uslt.language, "eng", 'id3v23.USLT.language');
+      assert.isDefined(uslt.text, 'id3v23.USLT.text');
+      assert.strictEqual(uslt.text, expectedLyricsText, 'id3v23.USLT.text');
+
       // Check mapping to common IDv2.3 tag
       assert.isDefined(common.lyrics, 'Should map tag id3v23.USLT to common.lyrics');
-      assert.strictEqual(common.lyrics[0], lyrics);
+      const lyrics = common.lyrics[0];
+      assert.strictEqual(lyrics.descriptor, "Sinner's Prayer", 'common.lyrics.descriptor');
+      assert.strictEqual(lyrics.language, "eng", 'common.lyrics.language');
+      assert.isDefined(lyrics.text, 'common.lyrics.text');
+      assert.strictEqual(lyrics.text, expectedLyricsText, 'common.lyrics.text');
+    });
 
+    // Issue: https://github.com/Borewit/music-metadata/issues/2134
+    it('4.10. Synchronised lyrics/text', async () => {
+      const filePath = path.join(samplePath, 'mp3', 'menu-sash.mp3');
+
+      const {format, native} = await mm.parseFile(filePath);
+
+      assert.strictEqual(format.container, 'MPEG');
+      assert.strictEqual(format.codec, 'MPEG 1 Layer 3');
+      assert.isDefined(native['ID3v2.3'], 'Presence of ID3v2.3 tag header');
+      const id3v23 = mm.orderTags(native['ID3v2.3']);
+      const syltTags = id3v23.SYLT as ILyricsTag[];
+      assert.strictEqual(syltTags.length, 3, 'Number of SYLT tags');
+
+      [syltTags[0], syltTags[1]].forEach(sylt => {
+        assert.strictEqual(sylt.descriptor, 'captions', 'id3v23.sylt.descriptor');
+        assert.strictEqual(sylt.timeStampFormat, TimestampFormat.milliseconds, 'id3v23.sylt.timeStampFormat in milliseconds');
+        assert.strictEqual(sylt.language, 'eng', 'id3v23.sylt.language');
+        assert.strictEqual(sylt.contentType, LyricsContentType.text, 'id3v23.sylt.contentType');
+        assert.deepEqual(sylt.syncText, [
+          {
+            text: 'Check out your sash!',
+            timestamp: 9
+          }
+        ], 'id3v23.sylt.syncText');
+      });
+
+      assert.strictEqual(syltTags[2].descriptor, 'lipsync', 'id3v23.sylt.descriptor');
+      assert.strictEqual(syltTags[2].timeStampFormat, TimestampFormat.milliseconds, 'id3v23.sylt.timeStampFormat in milliseconds');
+      assert.strictEqual(syltTags[2].language, 'eng', 'id3v23.sylt.language');
+      assert.strictEqual(syltTags[2].contentType, LyricsContentType.other, 'id3v23.sylt.contentType');
+      assert.deepEqual(syltTags[2].syncText, [
+        {
+          text: 'X',
+          timestamp: 0
+        }, {
+          text: 'F',
+          timestamp: 110
+        }, {
+          text: 'C',
+          timestamp: 280
+        }, {
+          text: 'F',
+          timestamp: 350
+        }, {
+          text: 'B',
+          timestamp: 560
+        }, {
+          text: 'C',
+          timestamp: 630
+        }, {
+          text: 'B',
+          timestamp: 980
+        }, {
+          text: 'X',
+          timestamp: 1120
+        }], 'id3v23.sylt.syncText');
     });
 
     // http://id3.org/id3v2.3.0#General_encapsulated_object
@@ -281,13 +362,14 @@ describe('Extract metadata from ID3v2.3 header', () => {
 
       assert.strictEqual(format.container, 'MPEG', 'format.container');
       assert.deepEqual(format.tagTypes, ['ID3v2.3'], 'format.tagTypes');
-
       assert.strictEqual(common.title, 'test', 'common.title');
 
+      assert.isDefined(native['ID3v2.3'], 'Presence of ID3v2.3 tag header');
       const id3v2 = mm.orderTags(native['ID3v2.3']);
-      assert.deepEqual(id3v2.GEOB[0].type, 'application/octet-stream', 'ID3v2.GEOB[0].type');
-      assert.deepEqual(id3v2.GEOB[0].filename, '', 'ID3v2.GEOB[0].filename');
-      assert.deepEqual(id3v2.GEOB[0].description, 'Serato Overview', 'ID3v2.GEOB[0].description');
+      const geob = id3v2.GEOB[0] as IGeneralEncapsulatedObject;
+      assert.deepEqual(geob.type, 'application/octet-stream', 'ID3v2.GEOB[0].type');
+      assert.deepEqual(geob.filename, '', 'ID3v2.GEOB[0].filename');
+      assert.deepEqual(geob.description, 'Serato Overview', 'ID3v2.GEOB[0].description');
     });
 
     it('4.18 POPM', async () => {
@@ -306,11 +388,11 @@ describe('Extract metadata from ID3v2.3 header', () => {
         const filePath = path.join(samplePath, 'rating', testCaseFile.file);
         const {common} = await mm.parseFile(filePath);
         if (common.rating === undefined) {
-          assert.isUndefined(common.rating, 'Expect no rating property to be present in: ' + testCaseFile.file);
+          assert.isUndefined(common.rating, `Expect no rating property to be present in: ${testCaseFile.file}`);
         } else {
-          assert.isDefined(common.rating, 'Expect rating property to be present in: ' + testCaseFile.file);
-          assert.equal(Math.round(common.rating[0].rating * 4 + 1), testCaseFile.stars, 'ID3v2.3 rating conversion in: ' + testCaseFile.file);
-          assert.equal(mm.ratingToStars(common.rating[0].rating), testCaseFile.stars, 'ID3v2.3 rating conversion in: ' + testCaseFile.file);
+          assert.isDefined(common.rating, `Expect rating property to be present in: ${testCaseFile.file}`);
+          assert.equal(Math.round(common.rating[0].rating * 4 + 1), testCaseFile.stars, `ID3v2.3 rating conversion in: ${testCaseFile.file}`);
+          assert.equal(mm.ratingToStars(common.rating[0].rating), testCaseFile.stars, `ID3v2.3 rating conversion in: ${testCaseFile.file}`);
         }
       }
     });
@@ -379,7 +461,7 @@ describe('Extract metadata from ID3v2.3 header', () => {
 
       const {native, common} = await mm.parseFile(filePath);
       assert.isDefined(native['ID3v2.4'], 'Expect ID3v2.4 tag header to be present');
-      const grp1Tags = native['ID3v2.4'].filter(tag => tag.id==='GRP1');
+      const grp1Tags = native['ID3v2.4'].filter(tag => tag.id === 'GRP1');
       assert.strictEqual(grp1Tags.length, 1, 'Expect ID3v2.4 GRP1 tag be present');
       assert.strictEqual(grp1Tags[0].value, 'GRP1-Test', 'Expect ID3v2.4 GRP1 value');
 

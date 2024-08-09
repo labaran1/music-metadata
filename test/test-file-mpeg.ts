@@ -6,6 +6,7 @@ import { samplePath, SourceStream } from './util.js';
 import { ID3v24TagMapper } from '../lib/id3v2/ID3v24TagMapper.js';
 import { Parsers } from './metadata-parsers.js';
 import * as mm from '../lib/index.js';
+import type { IPopularimeter } from '../lib/id3v2/FrameParser.js';
 
 const t = assert;
 
@@ -111,7 +112,11 @@ describe('Parse MPEG', () => {
         t.strictEqual(common.disk.no, null, 'common.disk.no');
         t.strictEqual(common.disk.of, null, 'common.disk.of');
         t.deepEqual(common.genre, ['Ska-Punk'], 'common.genre');
-        t.deepEqual(common.comment, ['Jive'], 'common.genre');
+        t.deepEqual(common.comment, [{
+          descriptor: "",
+          language: "eng",
+          text: "Jive"
+        }], 'common.genre');
       }
 
       function checkID3v1(id3v1: mm.INativeTagDict) {
@@ -134,7 +139,7 @@ describe('Parse MPEG', () => {
         t.deepEqual(id3v23.TYER, ['1998'], 'native: TYER');
         t.deepEqual(id3v23.TCOM, ['CA'], 'native: TCOM'); // ToDo: common property?
         t.deepEqual(id3v23.TRCK, ['04'], 'native: TRCK');
-        t.deepEqual(id3v23.COMM, [{description: '', language: 'eng', text: 'Jive'}], 'native: COMM');
+        t.deepEqual(id3v23.COMM, [{descriptor: '', language: 'eng', text: 'Jive'}], 'native: COMM');
       }
 
       const result = await mm.parseFile(filePath, {duration: true});
@@ -175,7 +180,7 @@ describe('Parse MPEG', () => {
         t.strictEqual(common.disk.no, null, 'common.disk.no');
         t.strictEqual(common.disk.of, null, 'common.disk.of');
         t.deepEqual(common.genre, ['Ska-Punk'], 'common.genre');
-        t.deepEqual(common.comment, ['Jive'], 'common.genre');
+        t.deepEqual(common.comment, [{descriptor: '', language: 'eng', text: 'Jive'}], 'common.comment');
       }
 
       function checkID3v23(native: mm.INativeTagDict) {
@@ -187,7 +192,7 @@ describe('Parse MPEG', () => {
         t.deepEqual(native.TYER, ['1998'], 'native: TYER');
         t.deepEqual(native.TCOM, ['CA'], 'native: TCOM');
         t.deepEqual(native.TRCK, ['07'], 'native: TRCK');
-        t.deepEqual(native.COMM, [{description: '', language: 'eng', text: 'Jive'}], 'native: COMM');
+        t.deepEqual(native.COMM, [{descriptor: '', language: 'eng', text: 'Jive'}], 'native: COMM');
       }
 
       const result = await mm.parseFile(filePath, {duration: true});
@@ -280,15 +285,15 @@ describe('Parse MPEG', () => {
 
     it('check mapping function', () => {
 
-      assert.deepEqual(ID3v24TagMapper.toRating({email: 'user1@bla.com', rating: 0}), {
+      assert.deepEqual(ID3v24TagMapper.toRating({email: 'user1@bla.com', rating: 0} as IPopularimeter), {
         source: 'user1@bla.com',
         rating: undefined
       }, 'unknown rating');
-      assert.deepEqual(ID3v24TagMapper.toRating({email: 'user1@bla.com', rating: 1}), {
+      assert.deepEqual(ID3v24TagMapper.toRating({email: 'user1@bla.com', rating: 1} as IPopularimeter), {
         source: 'user1@bla.com',
         rating: 0 / 255
       }, 'lowest rating');
-      assert.deepEqual(ID3v24TagMapper.toRating({email: 'user1@bla.com', rating: 255}), {
+      assert.deepEqual(ID3v24TagMapper.toRating({email: 'user1@bla.com', rating: 255} as IPopularimeter), {
         source: 'user1@bla.com',
         rating: 1
       }, 'highest rating');
@@ -353,7 +358,8 @@ describe('Parse MPEG', () => {
       const stream = new SourceStream(buffer);
 
       const metadata = await mm.parseStream(stream, {mimeType: 'audio/mpeg'}, {duration: true});
-      assert.approximately(metadata.format.duration, 34.66, 5 / 1000);
+      // Changed expected result from 34.66 to 34.64, after updating strtok3
+      assert.approximately(metadata.format.duration, 34.64, 5 / 1000);
     });
 
   });

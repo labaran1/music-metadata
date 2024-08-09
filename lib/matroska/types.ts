@@ -3,7 +3,7 @@ export interface IHeader {
   len: number;
 }
 
-export enum DataType { 'string', uint, uid, bool, binary, float}
+export enum DataType { 'string' = 0, uint = 1, uid = 2, bool = 3, binary = 4, float = 5}
 
 export interface IElementType<T> {
   readonly name: string;
@@ -12,12 +12,14 @@ export interface IElementType<T> {
   readonly multiple?: boolean;
 }
 
-export interface IContainerType { [id: number]: IElementType<string | number | boolean | Buffer>; }
+export interface IContainerType { [id: number]: IElementType<string | number | boolean | Uint8Array>; }
 
-export interface ITree { [name: string]: string | number | boolean | Buffer | ITree | ITree[]; }
+export interface ITree { [name: string]: string | number | boolean | Uint8Array | ITree | ITree[]; }
+
+export type ValueType = string | number | Uint8Array | boolean | ITree | ITree[];
 
 export interface ISeekHead {
-  id?: Buffer;
+  id?: Uint8Array;
   position?: number;
 }
 
@@ -26,7 +28,7 @@ export interface IMetaSeekInformation {
 }
 
 export interface ISegmentInformation {
-  uid?: Buffer;
+  uid?: Uint8Array;
   timecodeScale?: number;
   duration?: number;
   dateUTC?: number;
@@ -36,7 +38,7 @@ export interface ISegmentInformation {
 }
 
 export interface ITrackEntry {
-  uid?: Buffer;
+  uid?: Uint8Array;
   trackNumber?: number;
   trackType?: TrackType;
   audio?: ITrackAudio;
@@ -49,7 +51,7 @@ export interface ITrackEntry {
   name?: string;
   language?: string;
   codecID?: string;
-  codecPrivate?: Buffer;
+  codecPrivate?: Uint8Array;
   codecName?: string;
   codecSettings?: string;
   codecInfoUrl?: string;
@@ -67,7 +69,7 @@ export interface ITrackVideo {
   displayHeight?: number;
   displayUnit?: number;
   aspectRatioType?: number;
-  colourSpace?: Buffer;
+  colourSpace?: Uint8Array;
   gammaValue?: number;
 }
 
@@ -75,7 +77,7 @@ export interface ITrackAudio {
   samplingFrequency?: number;
   outputSamplingFrequency?: number;
   channels?: number;
-  channelPositions?: Buffer;
+  channelPositions?: Uint8Array;
   bitDepth?: number;
 }
 
@@ -102,7 +104,7 @@ export interface ICueReference {
 export interface ISimpleTag {
   name?: string;
   'string'?: string;
-  binary?: Buffer;
+  binary?: Uint8Array;
   language?: string;
   default?: boolean;
 }
@@ -128,9 +130,9 @@ export enum TrackType {
 }
 
 export interface ITarget {
-  trackUID?: Buffer;
-  chapterUID?: Buffer;
-  attachmentUID?: Buffer;
+  trackUID?: Uint8Array;
+  chapterUID?: Uint8Array;
+  attachmentUID?: Uint8Array;
   targetTypeValue?: TargetType;
   targetType?: string;
 }
@@ -152,7 +154,7 @@ export interface IAttachmedFile {
   description?: string;
   name: string;
   mimeType: string;
-  data: Buffer;
+  data: Uint8Array;
   uid: string;
 }
 

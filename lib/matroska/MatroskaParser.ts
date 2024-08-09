@@ -2,13 +2,14 @@ import { Float32_BE, Float64_BE, StringType, UINT8 } from 'token-types';
 import initDebug from 'debug';
 import type { ITokenizer } from 'strtok3';
 
-import { INativeMetadataCollector } from '../common/MetadataCollector.js';
+import type { INativeMetadataCollector } from '../common/MetadataCollector.js';
 import { BasicParser } from '../common/BasicParser.js';
 import * as matroskaDtd from './MatroskaDtd.js';
-import { DataType, IContainerType, IHeader, IMatroskaDoc, ITree, TargetType, TrackType } from './types.js';
+import { DataType, type IContainerType, type IHeader, type IMatroskaDoc, type ITree, TargetType, TrackType, type ValueType } from './types.js';
 
-import { IOptions, ITrackInfo } from '../type.js';
-import { ITokenParser } from '../ParserFactory.js';
+import type { AnyTagValue, IOptions, ITrackInfo } from '../type.js';
+import type { ITokenParser } from '../ParserFactory.js';
+import * as Token from 'token-types';
 
 const debug = initDebug('music-metadata:parser:matroska');
 
@@ -21,9 +22,9 @@ const debug = initDebug('music-metadata:parser:matroska');
  */
 export class MatroskaParser extends BasicParser {
 
-  private padding: number = 0;
+  private padding = 0;
 
-  private parserMap = new Map<DataType, (e: IHeader) => Promise<any>>();
+  private parserMap = new Map<DataType, (e: IHeader) => Promise<ValueType>>();
 
   private ebmlMaxIDLength = 4;
   private ebmlMaxSizeLength = 8;
@@ -33,7 +34,7 @@ export class MatroskaParser extends BasicParser {
     this.parserMap.set(DataType.uint, e => this.readUint(e));
     this.parserMap.set(DataType.string, e => this.readString(e));
     this.parserMap.set(DataType.binary, e => this.readBuffer(e));
-    this.parserMap.set(DataType.uid, async e => await this.readUint(e) === 1);
+    this.parserMap.set(DataType.uid, async e => this.readBuffer(e));
     this.parserMap.set(DataType.bool, e => this.readFlag(e));
     this.parserMap.set(DataType.float, e => this.readFloat(e));
   }
@@ -50,23 +51,24 @@ export class MatroskaParser extends BasicParser {
   }
 
   public async parse(): Promise<void> {
-    const matroska = await this.parseContainer(matroskaDtd.elements, this.tokenizer.fileInfo.size, []) as any as IMatroskaDoc;
+    const containerSize = this.tokenizer.fileInfo.size ?? Number.MAX_SAFE_INTEGER;
+    const matroska = await this.parseContainer(matroskaDtd.elements, containerSize, []) as unknown as IMatroskaDoc;
 
     this.metadata.setFormat('container', `EBML/${matroska.ebml.docType}`);
     if (matroska.segment) {
 
       const info = matroska.segment.info;
       if (info) {
-        const timecodeScale = info.timecodeScale ? info.timecodeScale : 1000000;
+        const timecodeScale = info.timecodeScale ? info.timecodeScale :1000000;
         if (typeof info.duration === 'number') {
           const duration = info.duration * timecodeScale / 1000000000;
           await this.addTag('segment:title', info.title);
-          this.metadata.setFormat('duration', duration);
+          this.metadata.setFormat('duration', Number(duration));
         }
       }
 
       const audioTracks = matroska.segment.tracks;
-      if (audioTracks && audioTracks.entries) {
+      if (audioTracks?.entries) {
 
         audioTracks.entries.forEach(entry => {
           const stream: ITrackInfo = {
@@ -176,7 +178,7 @@ export class MatroskaParser extends BasicParser {
     return tree;
   }
 
-  private async readVintData(maxLength: number): Promise<Buffer> {
+  private async readVintData(maxLength: number): Promise<Uint8Array> {
     const msb = await this.tokenizer.peekNumber(UINT8);
     let mask = 0x80;
     let oc = 1;
@@ -189,7 +191,7 @@ export class MatroskaParser extends BasicParser {
       ++oc;
       mask >>= 1;
     }
-    const id = Buffer.alloc(oc);
+    const id = new Uint8Array(oc);
     await this.tokenizer.readBuffer(id);
     return id;
   }
@@ -198,21 +200,10 @@ export class MatroskaParser extends BasicParser {
     const id = await this.readVintData(this.ebmlMaxIDLength);
     const lenField = await this.readVintData(this.ebmlMaxSizeLength);
     lenField[0] ^= 0x80 >> (lenField.length - 1);
-    const nrLen = Math.min(6, lenField.length); // JavaScript can max read 6 bytes integer
     return {
-      id: id.readUIntBE(0, id.length),
-      len: lenField.readUIntBE(lenField.length - nrLen, nrLen)
+      id: MatroskaParser.readUIntBE(id, id.length),
+      len: MatroskaParser.readUIntBE(lenField, lenField.length)
     };
-  }
-
-  private isMaxValue(vintData: Buffer) {
-    if (vintData.length === this.ebmlMaxSizeLength) {
-      for (let n = 1; n < this.ebmlMaxSizeLength; ++n) {
-        if (vintData[n] !== 0xff) return false;
-      }
-      return true;
-    }
-    return false;
   }
 
   private async readFloat(e: IHeader) {
@@ -236,8 +227,7 @@ export class MatroskaParser extends BasicParser {
 
   private async readUint(e: IHeader): Promise<number> {
     const buf = await this.readBuffer(e);
-    const nrLen = Math.min(6, e.len); // JavaScript can max read 6 bytes integer
-    return buf.readUIntBE(e.len - nrLen, nrLen);
+    return MatroskaParser.readUIntBE(buf, e.len);
   }
 
   private async readString(e: IHeader): Promise<string> {
@@ -245,13 +235,34 @@ export class MatroskaParser extends BasicParser {
     return rawString.replace(/\x00.*$/g, '');
   }
 
-  private async readBuffer(e: IHeader): Promise<Buffer> {
-    const buf = Buffer.alloc(e.len);
+  private async readBuffer(e: IHeader): Promise<Uint8Array> {
+    const buf = new Uint8Array(e.len);
     await this.tokenizer.readBuffer(buf);
     return buf;
   }
 
-  private async addTag(tagId: string, value: any): Promise<void> {
+  private async addTag(tagId: string, value: AnyTagValue): Promise<void> {
     await this.metadata.addTag('matroska', tagId, value);
+  }
+
+  private static readUIntBE(buf: Uint8Array, len: number): number {
+    return Number(MatroskaParser.readUIntBeAsBigInt(buf, len));
+  }
+
+  /**
+   * Reeds an unsigned integer from a big endian buffer of length `len`
+   * @param buf Buffer to decode from
+   * @param len Number of bytes
+   * @private
+   */
+  private static readUIntBeAsBigInt(buf: Uint8Array, len: number): bigint {
+    const normalizedNumber = new Uint8Array(8);
+    const cleanNumber = buf.subarray(0, len);
+    try {
+      normalizedNumber.set(cleanNumber, 8 - len);
+      return Token.UINT64_BE.get(normalizedNumber, 0);
+    } catch(error) {
+      return BigInt(-1);
+    }
   }
 }

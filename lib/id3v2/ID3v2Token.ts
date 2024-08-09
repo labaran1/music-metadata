@@ -8,27 +8,27 @@ import * as util from '../common/Util.js';
  * Ref: http://id3.org/id3v2.3.0#Attached_picture
  */
 export enum AttachedPictureType {
-  'Other',
-  "32x32 pixels 'file icon' (PNG only)",
-  'Other file icon',
-  'Cover (front)',
-  'Cover (back)',
-  'Leaflet page',
-  'Media (e.g. label side of CD)',
-  'Lead artist/lead performer/soloist',
-  'Artist/performer',
-  'Conductor',
-  'Band/Orchestra',
-  'Composer',
-  'Lyricist/text writer',
-  'Recording Location',
-  'During recording',
-  'During performance',
-  'Movie/video screen capture',
-  'A bright coloured fish',
-  'Illustration',
-  'Band/artist logotype',
-  'Publisher/Studio logotype'
+  'Other' = 0,
+  "32x32 pixels 'file icon' (PNG only)" = 1,
+  'Other file icon' = 2,
+  'Cover (front)' = 3,
+  'Cover (back)' = 4,
+  'Leaflet page' = 5,
+  'Media (e.g. label side of CD)' = 6,
+  'Lead artist/lead performer/soloist' = 7,
+  'Artist/performer' = 8,
+  'Conductor' = 9,
+  'Band/Orchestra' = 10,
+  'Composer' = 11,
+  'Lyricist/text writer' = 12,
+  'Recording Location' = 13,
+  'During recording' = 14,
+  'During performance' = 15,
+  'Movie/video screen capture' = 16,
+  'A bright coloured fish' = 17,
+  'Illustration' = 18,
+  'Band/artist logotype' = 19,
+  'Publisher/Studio logotype' = 20
 }
 
 export type ID3v2MajorVersion = 2 | 3 | 4;
@@ -41,6 +41,25 @@ export interface IExtendedHeader {
   sizeOfPadding: number;
   // CRC data present
   crcDataPresent: boolean;
+}
+
+/**
+ * https://id3.org/id3v2.3.0#Synchronised_lyrics.2Ftext
+ */
+export enum LyricsContentType {
+  other = 0,
+  lyrics = 1,
+  text = 2,
+  movement_part = 3,
+  events = 4,
+  chord = 5,
+  trivia_pop = 6
+}
+
+export enum TimestampFormat {
+  notSynchronized0 = 0,
+  mpegFrameNumber = 1,
+  milliseconds = 2
 }
 
 /**
@@ -87,7 +106,7 @@ export interface IID3v2header {
 export const ID3v2Header: IGetToken<IID3v2header> = {
   len: 10,
 
-  get: (buf: Buffer, off): IID3v2header => {
+  get: (buf: Uint8Array, off): IID3v2header => {
     return {
       // ID3v2/file identifier   "ID3"
       fileIdentifier: new Token.StringType(3, 'ascii').get(buf, off),
@@ -150,5 +169,52 @@ export const TextEncodingToken: IGetToken<ITextEncoding> = {
         return {encoding: 'utf8', bom: false};
 
     }
+  }
+};
+
+/**
+ * `USLT` frame fields
+ */
+export interface ITextHeader {
+  encoding: ITextEncoding;
+  language: string;
+}
+
+/**
+ * Used to read first portion of `SYLT` frame
+ */
+export const TextHeader: IGetToken<ITextHeader> = {
+  len: 4,
+
+  get: (uint8Array: Uint8Array, off: number): ITextHeader => {
+    return {
+      encoding: TextEncodingToken.get(uint8Array, off),
+      language: new Token.StringType(3, 'latin1').get(uint8Array, off + 1)
+    };
+  }
+};
+
+/**
+ * SYLT` frame fields
+ */
+export interface ISyncTextHeader extends ITextHeader {
+  contentType: LyricsContentType;
+  timeStampFormat: TimestampFormat;
+}
+
+/**
+ * Used to read first portion of `SYLT` frame
+ */
+export const SyncTextHeader: IGetToken<ISyncTextHeader> = {
+  len: 6,
+
+  get: (uint8Array: Uint8Array, off: number): ISyncTextHeader => {
+    const text = TextHeader.get(uint8Array, off);
+    return {
+      encoding: text.encoding,
+      language: text.language,
+      timeStampFormat: Token.UINT8.get(uint8Array, off + 4),
+      contentType: Token.UINT8.get(uint8Array, off + 5)
+    };
   }
 };

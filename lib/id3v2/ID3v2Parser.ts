@@ -2,12 +2,12 @@ import type { ITokenizer } from 'strtok3';
 import * as Token from 'token-types';
 
 import * as util from '../common/Util.js';
-import { TagType } from '../common/GenericTagTypes.js';
-import { FrameParser } from './FrameParser.js';
-import { ExtendedHeader, ID3v2Header, ID3v2MajorVersion, IID3v2header, UINT32SYNCSAFE } from './ID3v2Token.js';
+import type { TagType } from '../common/GenericTagTypes.js';
+import { FrameParser, type ITextTag } from './FrameParser.js';
+import { ExtendedHeader, ID3v2Header, type ID3v2MajorVersion, type IID3v2header, UINT32SYNCSAFE } from './ID3v2Token.js';
 
-import { ITag, IOptions } from '../type.js';
-import { INativeMetadataCollector, IWarningCollector } from '../common/MetadataCollector.js';
+import type { ITag, IOptions, AnyTagValue } from '../type.js';
+import type { INativeMetadataCollector, IWarningCollector } from '../common/MetadataCollector.js';
 
 interface IFrameFlags {
   status: {
@@ -94,7 +94,7 @@ export class ID3v2Parser {
         }
         return frameParser.readData(uint8Array, frameHeader.id, includeCovers);
       default:
-        throw new Error('Unexpected majorVer: ' + majorVer);
+        throw new Error(`Unexpected majorVer: ${majorVer}`);
     }
   }
 
@@ -105,7 +105,7 @@ export class ID3v2Parser {
    * @returns string e.g. COM:iTunPGAP
    */
   private static makeDescriptionTagName(tag: string, description: string): string {
-    return tag + (description ? ':' + description : '');
+    return tag + (description ? `:${description}` : '');
   }
 
   private tokenizer: ITokenizer;
@@ -129,7 +129,7 @@ export class ID3v2Parser {
 
     this.id3Header = id3Header;
 
-    this.headerType = ('ID3v2.' + id3Header.version.major) as TagType;
+    this.headerType = (`ID3v2.${id3Header.version.major}`) as TagType;
 
     return id3Header.flags.isExtendedHeader ? this.parseExtendedHeader() : this.parseId3Data(id3Header.size);
   }
@@ -148,35 +148,31 @@ export class ID3v2Parser {
   public async parseId3Data(dataLen: number): Promise<void> {
     const uint8Array = await this.tokenizer.readToken(new Token.Uint8ArrayType(dataLen));
     for (const tag of this.parseMetadata(uint8Array)) {
-      if (tag.id === 'TXXX') {
-        if (tag.value) {
-          await Promise.all(tag.value.text.map(text =>
-            this.addTag(ID3v2Parser.makeDescriptionTagName(tag.id, tag.value.description), text)
-          ));
-        }
-      } else if (tag.id === 'COM') {
-        await Promise.all(tag.value.map(value =>
-          this.addTag(ID3v2Parser.makeDescriptionTagName(tag.id, value.description), value.text)
-        ));
-      } else if (tag.id === 'COMM') {
-        await Promise.all(tag.value.map(value =>
-          this.addTag(ID3v2Parser.makeDescriptionTagName(tag.id, value.description), value)
-        ));
-      } else if (Array.isArray(tag.value)) {
-        await Promise.all(tag.value.map(value => this.addTag(tag.id, value)));
-      } else {
-        await this.addTag(tag.id, tag.value);
+      switch (tag.id) {
+        case 'TXXX':
+          if (tag.value) {
+            await this.handleTag(tag, (tag.value as ITextTag).text, () => (tag.value as ITextTag).description);
+          }
+          break;
+        default:
+          await (Array.isArray(tag.value) ? Promise.all(tag.value.map(value => this.addTag(tag.id, value))) : this.addTag(tag.id, tag.value));
       }
     }
   }
 
-  private async addTag(id: string, value: any): Promise<void> {
+  private async handleTag(tag: ITag, values: string[], descriptor: (x: AnyTagValue) => string, resolveValue: (x: string) => string = value => value): Promise<void> {
+    await Promise.all(values.map(value =>
+      this.addTag(ID3v2Parser.makeDescriptionTagName(tag.id, descriptor(value)), resolveValue(value))
+    ));
+  }
+
+  private async addTag(id: string, value: AnyTagValue): Promise<void> {
     await this.metadata.addTag(this.headerType, id, value);
   }
 
   private parseMetadata(data: Uint8Array): ITag[] {
     let offset = 0;
-    const tags: { id: string, value: any }[] = [];
+    const tags: { id: string, value: AnyTagValue }[] = [];
 
     while (true) {
       if (offset === data.length) break;
@@ -188,10 +184,12 @@ export class ID3v2Parser {
         break;
       }
 
-      const frameHeaderBytes = data.slice(offset, offset += frameHeaderLength);
+      const frameHeaderBytes = data.slice(offset, offset + frameHeaderLength);
+      offset += frameHeaderLength;
       const frameHeader = this.readFrameHeader(frameHeaderBytes, this.id3Header.version.major);
 
-      const frameDataBytes = data.slice(offset, offset += frameHeader.length);
+      const frameDataBytes = data.slice(offset, offset + frameHeader.length);
+      offset += frameHeader.length;
       const values = ID3v2Parser.readFrameData(frameDataBytes, frameHeader, this.id3Header.version.major, !this.options.skipCovers, this.metadata);
       if (values) {
         tags.push({id: frameHeader.id, value: values});
@@ -227,7 +225,7 @@ export class ID3v2Parser {
         break;
 
       default:
-        throw new Error('Unexpected majorVer: ' + majorVer);
+        throw new Error(`Unexpected majorVer: ${majorVer}`);
     }
     return header;
   }

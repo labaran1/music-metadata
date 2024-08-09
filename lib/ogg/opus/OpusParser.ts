@@ -1,10 +1,10 @@
 import * as Token from 'token-types';
-import {ITokenizer} from 'strtok3';
+import type {ITokenizer} from 'strtok3';
 
-import {IPageHeader} from '../Ogg.js';
+import type {IPageHeader} from '../Ogg.js';
 import {VorbisParser} from '../vorbis/VorbisParser.js';
-import {IOptions} from '../../type.js';
-import {INativeMetadataCollector} from '../../common/MetadataCollector.js';
+import type {IOptions} from '../../type.js';
+import type {INativeMetadataCollector} from '../../common/MetadataCollector.js';
 
 import * as Opus from './Opus.js';
 
@@ -16,7 +16,7 @@ import * as Opus from './Opus.js';
 export class OpusParser extends VorbisParser {
 
   private idHeader: Opus.IIdHeader;
-  private lastPos: number = -1;
+  private lastPos = -1;
 
   constructor(metadata: INativeMetadataCollector, options: IOptions, private tokenizer: ITokenizer) {
     super(metadata, options);
@@ -25,9 +25,9 @@ export class OpusParser extends VorbisParser {
   /**
    * Parse first Opus Ogg page
    * @param {IPageHeader} header
-   * @param {Buffer} pageData
+   * @param {Uint8Array} pageData
    */
-  protected parseFirstPage(header: IPageHeader, pageData: Buffer) {
+  protected parseFirstPage(header: IPageHeader, pageData: Uint8Array) {
     this.metadata.setFormat('codec', 'Opus');
     // Parse Opus ID Header
     this.idHeader = new Opus.IdHeader(pageData.length).get(pageData, 0);
@@ -37,7 +37,7 @@ export class OpusParser extends VorbisParser {
     this.metadata.setFormat('numberOfChannels', this.idHeader.channelCount);
   }
 
-  protected async parseFullPage(pageData: Buffer): Promise<void> {
+  protected async parseFullPage(pageData: Uint8Array): Promise<void> {
     const magicSignature = new Token.StringType(8, 'ascii').get(pageData, 0);
     switch (magicSignature) {
 

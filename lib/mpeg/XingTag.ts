@@ -2,7 +2,7 @@ import * as Token from 'token-types';
 import type { IGetToken, ITokenizer } from 'strtok3';
 
 import * as util from '../common/Util.js';
-import { ExtendedLameHeader, IExtendedLameHeader } from './ExtendedLameHeader.js';
+import { ExtendedLameHeader, type IExtendedLameHeader } from './ExtendedLameHeader.js';
 
 export interface IXingHeaderFlags {
   frames: boolean;
@@ -35,7 +35,7 @@ export interface IXingInfoTag {
    */
   streamSize?: number,
 
-  toc?: Buffer;
+  toc?: Uint8Array;
 
   /**
    * the number of header data bytes (from original file)
@@ -79,7 +79,7 @@ export async function readXingHeader(tokenizer: ITokenizer): Promise<IXingInfoTa
     xingInfoTag.streamSize = await tokenizer.readToken(Token.UINT32_BE);
   }
   if (flags.toc) {
-    xingInfoTag.toc = Buffer.alloc(100);
+    xingInfoTag.toc = new Uint8Array(100);
     await tokenizer.readBuffer(xingInfoTag.toc);
   }
   if (flags.vbrScale) {
@@ -94,7 +94,7 @@ export async function readXingHeader(tokenizer: ITokenizer): Promise<IXingInfoTa
     const match = xingInfoTag.lame.version.match(/\d+.\d+/g);
     if (match) {
       const majorMinorVersion = xingInfoTag.lame.version.match(/\d+.\d+/g)[0]; // e.g. 3.97
-      const version = majorMinorVersion.split('.').map(n => parseInt(n, 10));
+      const version = majorMinorVersion.split('.').map(n => Number.parseInt(n, 10));
       if (version[0] >= 3 && version[1] >= 90) {
         xingInfoTag.lame.extended = await tokenizer.readToken(ExtendedLameHeader);
       }
